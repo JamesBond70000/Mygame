@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Flying Face Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: linear-gradient(#70c5ce, #ffffff);
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Load Images
+const birdImg = new Image();
+birdImg.src = "bird.png";
+
+const obstacleImg = new Image();
+obstacleImg.src = "obstacle.png";
+
+// Game variables
+let gameState = "start";
+let score = 0;
+let highScore = localStorage.getItem("highScore") || 0;
+let frame = 0;
+
+let bird = {
+  x: 100,
+  y: canvas.height / 2,
+  width: 80,
+  height: 80,
+  gravity: 0.6,
+  lift: -12,
+  velocity: 0
+};
+
+let pipes = [];
+
+function resetGame() {
+  bird.y = canvas.height / 2;
+  bird.velocity = 0;
+  pipes = [];
+  score = 0;
+  frame = 0;
+  gameState = "playing";
+}
+
+document.addEventListener("touchstart", handleInput);
+document.addEventListener("click", handleInput);
+
+function handleInput() {
+  if (gameState === "start") {
+    resetGame();
+  } else if (gameState === "playing") {
+    bird.velocity = bird.lift;
+  } else if (gameState === "gameover") {
+    gameState = "start";
+  }
+}
+
+function createPipe() {
+  let gap = 500;   // Bigger gap = shorter looking obstacles
+  let maxHeight = canvas.height / 3;   // Reduce max height
+  let topHeight = Math.random() * maxHeight;
+
+  pipes.push({
+    x: canvas.width,
+    width: 130,
+    top: topHeight,
+    bottom: canvas.height - topHeight - gap
+  });
+}
+
+function updateBird() {
+  bird.velocity += bird.gravity;
+  bird.y += bird.velocity;
+
+  if (bird.y + bird.height >= canvas.height) {
+    gameState = "gameover";
+  }
+
+  if (bird.y <= 0) {
+    bird.y = 0;
+  }
+}
+
+function updatePipes() {
+  pipes.forEach(pipe => {
+    pipe.x -= 5;
+
+    // Collision detection
+    if (
+      bird.x < pipe.x + pipe.width &&
+      bird.x + bird.width > pipe.x &&
+      (bird.y < pipe.top ||
+       bird.y + bird.height > canvas.height - pipe.bottom)
+    ) {
+      gameState = "gameover";
+    }
+
+    // Score update
+    if (pipe.x + pipe.width === bird.x) {
+      score++;
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem("highScore", highScore);
+      }
+    }
+  });
+
+  pipes = pipes.filter(pipe => pipe.x + pipe.width > 0);
+}
+
+function drawBird() {
+  ctx.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
+}
+
+function drawPipes() {
+  pipes.forEach(pipe => {
+    // Top obstacle (flipped)
+    ctx.save();
+    ctx.translate(pipe.x + pipe.width / 2, pipe.top);
+    ctx.scale(1, -1);
+    ctx.drawImage(obstacleImg, -pipe.width / 2, 0, pipe.width, pipe.top);
+    ctx.restore();
+
+    // Bottom obstacle
+    ctx.drawImage(
+      obstacleImg,
+      pipe.x,
+      canvas.height - pipe.bottom,
+      pipe.width,
+      pipe.bottom
+    );
+  });
+}
+
+function drawText(text, size, y) {
+  ctx.fillStyle = "black";
+  ctx.font = size + "px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(text, canvas.width / 2, y);
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (gameState === "playing") {
+
+    if (frame % 90 === 0) {
+      createPipe();
+    }
+
+    updateBird();
+    updatePipes();
+    drawPipes();
+    drawBird();
+
+    ctx.font = "30px Arial";
+    ctx.fillText("Score: " + score, 80, 50);
+
+  } else if (gameState === "start") {
+    drawText("Flying Face Game", 45, canvas.height/2 - 40);
+    drawText("Tap to Start", 28, canvas.height/2);
+    drawText("High Score: " + highScore, 24, canvas.height/2 + 40);
+
+  } else if (gameState === "gameover") {
+    drawText("Game Over", 45, canvas.height/2 - 40);
+    drawText("Score: " + score, 28, canvas.height/2);
+    drawText("Tap to Restart", 24, canvas.height/2 + 40);
+  }
+
+  frame++;
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
